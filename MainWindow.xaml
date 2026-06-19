@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:TreeToCSV"
         mc:Ignorable="d"
         Title="TreeToCSV" 
-        Icon="app_icon.ico"
+        Icon="app_icon.png"
         Height="650" Width="850" 
         MinWidth="650" MinHeight="500"
         WindowStartupLocation="CenterScreen"
@@ -280,8 +280,7 @@
                                             <!-- トグルボタン (＞) -->
                                             <ToggleButton x:Name="Expander" 
                                                           ClickMode="Press" 
-                                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" 
-                                                          Style="{StaticResource {x:Static GridView.GridViewScrollViewerStyleKey}}">
+                                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}">
                                                 <ToggleButton.Template>
                                                     <ControlTemplate TargetType="ToggleButton">
                                                         <Border Background="Transparent" Width="16" Height="16">
@@ -377,6 +376,11 @@
                                Margin="0,0,0,8"/>
                     <CheckBox Content="ファイル名・フォルダ名をダブルクォーテーション (&quot;) で囲む" 
                               IsChecked="{Binding QuoteFields, Mode=TwoWay}"
+                              Cursor="Hand"
+                              FontSize="13"
+                              Margin="0,0,0,6"/>
+                    <CheckBox Content="フォルダ名のみ出力する（ファイル名を除外する）" 
+                              IsChecked="{Binding FoldersOnly, Mode=TwoWay}"
                               Cursor="Hand"
                               FontSize="13"/>
                 </StackPanel>

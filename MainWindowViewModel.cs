@@ -31,6 +31,13 @@ public class MainWindowViewModel : INotifyPropertyChanged
         set => SetProperty(ref _quoteFields, value);
     }
 
+    private bool _foldersOnly = false;
+    public bool FoldersOnly
+    {
+        get => _foldersOnly;
+        set => SetProperty(ref _foldersOnly, value);
+    }
+
     public ObservableCollection<TreeNodeViewModel> TreeItems
     {
         get => _treeItems;
@@ -76,6 +83,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         }
 
         TreeItems.Clear();
+        ((RelayCommand)ExportCsvCommand).RaiseCanExecuteChanged();
 
         try
         {
@@ -93,6 +101,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
             PopulateChildren(rootNode);
 
             TreeItems.Add(rootNode);
+            ((RelayCommand)ExportCsvCommand).RaiseCanExecuteChanged();
         }
         catch (Exception ex)
         {
@@ -214,29 +223,33 @@ public class MainWindowViewModel : INotifyPropertyChanged
         // チェックが外れているノードとその配下は出力しない
         if (node.IsChecked == false) return;
 
-        // ノード自体を出力
-        var fields = new string[20];
-        for (int i = 0; i < 20; i++)
+        // フォルダ名のみ出力（ファイル名除外）設定の場合、ファイル（IsDirectory == false）はスキップする
+        if (!(FoldersOnly && !node.IsDirectory))
         {
-            fields[i] = string.Empty;
+            // ノード自体を出力
+            var fields = new string[20];
+            for (int i = 0; i < 20; i++)
+            {
+                fields[i] = string.Empty;
+            }
+
+            // 階層に応じて列（インデックス 0〜19）を設定
+            int colIndex = Math.Min(depth, 20) - 1;
+            
+            // CSV Formula Injection (数式インジェクション) 対策を適用
+            string name = EscapeFormulaInjection(node.Name);
+
+            if (QuoteFields)
+            {
+                // ダブルクォーテーションで囲む
+                name = $"\"{name}\"";
+            }
+
+            fields[colIndex] = name;
+
+            // カンマ区切りで書き出し
+            writer.WriteLine(string.Join(",", fields));
         }
-
-        // 階層に応じて列（インデックス 0〜19）を設定
-        int colIndex = Math.Min(depth, 20) - 1;
-        
-        // CSV Formula Injection (数式インジェクション) 対策を適用
-        string name = EscapeFormulaInjection(node.Name);
-
-        if (QuoteFields)
-        {
-            // ダブルクォーテーションで囲む
-            name = $"\"{name}\"";
-        }
-
-        fields[colIndex] = name;
-
-        // カンマ区切りで書き出し
-        writer.WriteLine(string.Join(",", fields));
 
         // 子要素を再帰的に走査
         foreach (var child in node.Children)
