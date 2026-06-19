@@ -173,6 +173,10 @@ public class MainWindowViewModel : INotifyPropertyChanged
                 ExportToCsvFile(dialog.FileName);
                 MessageBox.Show("CSV出力が完了しました。", "完了", MessageBoxButton.OK, MessageBoxImage.Information);
             }
+            catch (IOException ioEx)
+            {
+                MessageBox.Show($"CSVファイルに書き込めません。ファイルが他のプログラム（Excelなど）で開かれている可能性があります。\n\n詳細: {ioEx.Message}", "書き込みエラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
             catch (Exception ex)
             {
                 MessageBox.Show($"CSV出力中にエラーが発生しました:\n{ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -219,7 +223,9 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
         // 階層に応じて列（インデックス 0〜19）を設定
         int colIndex = Math.Min(depth, 20) - 1;
-        string name = node.Name;
+        
+        // CSV Formula Injection (数式インジェクション) 対策を適用
+        string name = EscapeFormulaInjection(node.Name);
 
         if (QuoteFields)
         {
@@ -237,6 +243,22 @@ public class MainWindowViewModel : INotifyPropertyChanged
         {
             WriteNodeToCsv(child, depth + 1, writer);
         }
+    }
+
+    /// <summary>
+    /// CSV Formula Injection (数式インジェクション) 脆弱性を対策するため、
+    /// 先頭が数式トリガー文字 (=, +, -, @) で始まる場合は、先頭にシングルクォーテーションを付与してテキスト化します。
+    /// </summary>
+    private string EscapeFormulaInjection(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+
+        char first = text[0];
+        if (first == '=' || first == '+' || first == '-' || first == '@')
+        {
+            return "'" + text;
+        }
+        return text;
     }
 
     #region INotifyPropertyChanged
