@@ -91,14 +91,19 @@ public class MainWindowViewModel : INotifyPropertyChanged
             var rootNode = new TreeNodeViewModel
             {
                 Name = rootDirInfo.Name,
-                FullPath = rootDirInfo.FullName,
+                FullPath = Path.GetFullPath(rootDirInfo.FullName),
                 IsDirectory = true,
                 IsChecked = true,
                 Parent = null
             };
 
+            var visitedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                rootNode.FullPath
+            };
+
             // サブフォルダとファイルを再帰的に読み込む
-            PopulateChildren(rootNode);
+            PopulateChildren(rootNode, visitedPaths, 1);
 
             TreeItems.Add(rootNode);
             ((RelayCommand)ExportCsvCommand).RaiseCanExecuteChanged();
@@ -112,8 +117,11 @@ public class MainWindowViewModel : INotifyPropertyChanged
     /// <summary>
     /// 指定されたノード配下の子要素（フォルダ・ファイル）を追加します。
     /// </summary>
-    private void PopulateChildren(TreeNodeViewModel parentNode)
+    private void PopulateChildren(TreeNodeViewModel parentNode, HashSet<string> visitedPaths, int depth)
     {
+        // スタックオーバーフローを防ぐための最大深度の制限
+        if (depth > 100) return;
+
         try
         {
             var dirInfo = new DirectoryInfo(parentNode.FullPath);
@@ -121,16 +129,27 @@ public class MainWindowViewModel : INotifyPropertyChanged
             // サブフォルダの追加
             foreach (var subDir in dirInfo.GetDirectories())
             {
+                string fullPath = Path.GetFullPath(subDir.FullName);
+
+                // 循環参照を検知してスキップ
+                if (visitedPaths.Contains(fullPath))
+                {
+                    continue;
+                }
+
                 var childNode = new TreeNodeViewModel
                 {
                     Name = subDir.Name,
-                    FullPath = subDir.FullName,
+                    FullPath = fullPath,
                     IsDirectory = true,
                     IsChecked = true,
                     Parent = parentNode
                 };
                 parentNode.Children.Add(childNode);
-                PopulateChildren(childNode); // 再帰スキャン
+
+                visitedPaths.Add(fullPath);
+                PopulateChildren(childNode, visitedPaths, depth + 1); // 再帰スキャン
+                visitedPaths.Remove(fullPath);
             }
 
             // ファイルの追加
@@ -139,7 +158,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
                 var childNode = new TreeNodeViewModel
                 {
                     Name = file.Name,
-                    FullPath = file.FullName,
+                    FullPath = Path.GetFullPath(file.FullName),
                     IsDirectory = false,
                     IsChecked = true,
                     Parent = parentNode
@@ -239,9 +258,19 @@ public class MainWindowViewModel : INotifyPropertyChanged
             // CSV Formula Injection (数式インジェクション) 対策を適用
             string name = EscapeFormulaInjection(node.Name);
 
-            if (QuoteFields)
+            // RFC 4180に基づくダブルクォーテーションのエスケープ処理
+            bool hasQuotes = name.Contains("\"");
+            bool hasComma = name.Contains(",");
+            bool hasNewLine = name.Contains("\r") || name.Contains("\n");
+
+            if (hasQuotes)
             {
-                // ダブルクォーテーションで囲む
+                name = name.Replace("\"", "\"\"");
+            }
+
+            // QuoteFieldsが有効、または特殊文字が含まれている場合はダブルクォーテーションで囲む
+            if (QuoteFields || hasQuotes || hasComma || hasNewLine)
+            {
                 name = $"\"{name}\"";
             }
 
